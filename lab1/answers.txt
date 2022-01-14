@@ -1,5 +1,5 @@
-Name:
-PERM #: 
+Name: Qi Su
+PERM #: 8313819
 
 Collaborators (who you talked to about the lab, what you talked about):
 
@@ -13,6 +13,32 @@ Other acknowledgments:
 -------------------------------------------------------------------------------
 
 Responses to exercises (if any) that need to go into answers.txt:
+
+5: It should have the same value. schedule() will run all process starting with the next process of the process who calls getpid(). The eax register has already been set for that process. The only difference is that the process who called getpid() will be scheduled to run at last, after all other runnable processes.
+
+7. To implement wait, I have added two fields in the PCB.
+
+```
+	int p_wait_pid;  // wait(p)
+	int p_waited_pid;  // waited by 
+```
+
+When a process A calls wait(B), the p_wait_pid of A will be set to B, and the p_waited_pid of B will be set to A.
+There are 4 invalid cases for wait(B):
+    + B is smaller than 0 (INVALID PID)
+    + B is greater than NPROCS (INVALID PID)
+    + B is A (INVALID CALL)
+    + B's state is P_EMPTY (DEAD PROCESS)
+These four cases return -1.
+
+If the call is valid, we first block the calling process A, by setting the p_state of A to P_BLOCKED.
+Then we set the p_wait_pid and p_waited_pid.
+When B exits, we add extra checks to see if is waited by any process. The check is done by the bi-direction pid.
+If B is waited by A, we clear A's waiting status(pid), set A to P_RUNNABLE and set the exit status of B to A's eax.
+
+There are two reasons for the bi-direction check:
+1. It is more efficient if we set a "waited by some process" flag to B. Otherwise, we have to loop the proc_array to see if some process if waiting for B when B is exiting.
+2. There might be circumstances when pid are reused (more than NPROCS processes are spawned). Consider the following senario: A with pid 100 waits for B; A exits somehow; After many new processes, C is spawned with pid 100. When B exits, if the wait pid check is not bi-directional, it may mess up the execution of C.
 
 
 Anything else you'd like us to know:
