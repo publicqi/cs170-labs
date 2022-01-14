@@ -168,8 +168,15 @@ interrupt(registers_t *reg)
 		// before calling the system call.  The %eax REGISTER has
 		// changed by now, but we can read the APPLICATION's setting
 		// for this register out of 'current->p_registers'.
-		current->p_state = P_ZOMBIE;
+		current->p_state = P_EMPTY;
 		current->p_exit_status = current->p_registers.reg_eax;
+
+		if (current->p_waited_pid &&
+			proc_array[current->p_waited_pid].p_wait_pid == current->p_pid){
+				proc_array[current->p_waited_pid].p_wait_pid = 0;
+				proc_array[current->p_waited_pid].p_state = P_RUNNABLE;
+				proc_array[current->p_waited_pid].p_registers.reg_eax = current->p_registers.reg_eax;
+			}
 		schedule();
 
 	case INT_SYS_WAIT: {
@@ -186,10 +193,11 @@ interrupt(registers_t *reg)
 		if (p <= 0 || p >= NPROCS || p == current->p_pid
 		    || proc_array[p].p_state == P_EMPTY)
 			current->p_registers.reg_eax = -1;
-		else if (proc_array[p].p_state == P_ZOMBIE)
-			current->p_registers.reg_eax = proc_array[p].p_exit_status;
-		else
-			current->p_registers.reg_eax = WAIT_TRYAGAIN;
+		else{
+			current->p_state = P_BLOCKED;
+			current->p_wait_pid = p;
+			proc_array[p].p_waited_pid = current->p_pid;
+		}
 		schedule();
 	}
 
@@ -240,7 +248,25 @@ do_fork(process_t *parent)
 	// You need to set one other process descriptor field as well.
 	// Finally, return the child's process ID to the parent.
 
-	return -1;
+	int slot = 0;
+	for(int i = 1; i < NPROCS; i++){
+		if(proc_array[i].p_state == P_EMPTY){
+			slot = i;
+			proc_array[slot].p_state = P_RUNNABLE;
+			break;
+		}
+	}
+	if(!slot){
+		return -1;
+	}
+
+	// Copy registers and stack
+	memcpy((void*)&(proc_array[slot].p_registers), (void*)&(parent->p_registers), sizeof(registers_t));
+	copy_stack(&(proc_array[slot]), parent);
+
+	proc_array[slot].p_pid = slot;
+	proc_array[slot].p_registers.reg_eax = 0;  // Child process has eax 0
+	return proc_array[slot].p_pid;
 }
 
 static void
@@ -298,12 +324,14 @@ copy_stack(process_t *dest, process_t *src)
 
 	// YOUR CODE HERE!
 
-	src_stack_top = 0 /* YOUR CODE HERE */;
+	// PROC_STACK_SIZE
+	src_stack_top = PROC1_STACK_ADDR + src->p_pid * PROC_STACK_SIZE;
 	src_stack_bottom = src->p_registers.reg_esp;
-	dest_stack_top = 0 /* YOUR CODE HERE */;
-	dest_stack_bottom = 0 /* YOUR CODE HERE: calculate based on the
-				 other variables */;
-	// YOUR CODE HERE: memcpy the stack and set dest->p_registers.reg_esp
+	// ASSERT SOMETHING HERE
+	dest_stack_top = PROC1_STACK_ADDR + dest->p_pid * PROC_STACK_SIZE;
+	dest_stack_bottom = dest_stack_top + (src_stack_bottom - src_stack_top);
+	memcpy((void *)dest_stack_bottom, (void *)src_stack_bottom, src_stack_top - src_stack_bottom);
+	dest->p_registers.reg_esp = dest_stack_bottom;
 }
 
 
