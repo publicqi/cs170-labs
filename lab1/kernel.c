@@ -168,9 +168,12 @@ interrupt(registers_t *reg)
 		// before calling the system call.  The %eax REGISTER has
 		// changed by now, but we can read the APPLICATION's setting
 		// for this register out of 'current->p_registers'.
+
+		// Directly set it to empty so the PCB can be reused
 		current->p_state = P_EMPTY;
 		current->p_exit_status = current->p_registers.reg_eax;
 
+		// Check if self is waited by some other process
 		if (current->p_waited_pid &&
 			proc_array[current->p_waited_pid].p_wait_pid == current->p_pid){
 				proc_array[current->p_waited_pid].p_wait_pid = 0;
@@ -248,6 +251,7 @@ do_fork(process_t *parent)
 	// You need to set one other process descriptor field as well.
 	// Finally, return the child's process ID to the parent.
 
+	// Find an empty slot
 	int slot = 0;
 	for(int i = 1; i < NPROCS; i++){
 		if(proc_array[i].p_state == P_EMPTY){
@@ -266,7 +270,7 @@ do_fork(process_t *parent)
 
 	proc_array[slot].p_pid = slot;
 	proc_array[slot].p_registers.reg_eax = 0;  // Child process has eax 0
-	return proc_array[slot].p_pid;
+	return proc_array[slot].p_pid;  // Parent process has a return value of the child's pid
 }
 
 static void
@@ -324,10 +328,8 @@ copy_stack(process_t *dest, process_t *src)
 
 	// YOUR CODE HERE!
 
-	// PROC_STACK_SIZE
 	src_stack_top = PROC1_STACK_ADDR + src->p_pid * PROC_STACK_SIZE;
 	src_stack_bottom = src->p_registers.reg_esp;
-	// ASSERT SOMETHING HERE
 	dest_stack_top = PROC1_STACK_ADDR + dest->p_pid * PROC_STACK_SIZE;
 	dest_stack_bottom = dest_stack_top + (src_stack_bottom - src_stack_top);
 	memcpy((void *)dest_stack_bottom, (void *)src_stack_bottom, src_stack_top - src_stack_bottom);
