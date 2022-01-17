@@ -40,5 +40,8 @@ There are two reasons for the bi-direction check:
 1. It is more efficient if we set a "waited by some process" flag to B. Otherwise, we have to loop the proc_array to see if some process if waiting for B when B is exiting.
 2. There might be circumstances when pid are reused (more than NPROCS processes are spawned). Consider the following senario: A with pid 100 waits for B; A exits somehow; After many new processes, C is spawned with pid 100. When B exits, if the wait pid check is not bi-directional, it may mess up the execution of C.
 
+9. This is the base merge.c. Resolve the conflict so that the merged file will print the same lines.
+
+11. Merge branch 'git-lab/mergeA' into git-lab/mergeB
 
 Anything else you'd like us to know:
