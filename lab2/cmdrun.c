@@ -232,8 +232,6 @@ cmd_exec(command_t *cmd, int *pass_pipefd)
 
 		// 2. Setup stdin pipe
 		dup2(*pass_pipefd, STDIN_FILENO);
-		close(pipefd[READ]);
-		close(pipefd[WRITE]);
 
 		// 3. Set up redirect_filename
 		redirect_fds(cmd);
@@ -297,7 +295,7 @@ static void redirect_fds(command_t* cmd){
 			perror("open");
 			abort();
 		}
-		dup2(stderr_fd, STDOUT_FILENO);
+		dup2(stderr_fd, STDERR_FILENO);
 		close(stderr_fd);
 	}
 }
