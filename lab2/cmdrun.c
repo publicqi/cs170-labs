@@ -237,9 +237,11 @@ cmd_exec(command_t *cmd, int *pass_pipefd)
 		redirect_fds(cmd);
 
 		// 4. Execute
-		handle_builtin_commands(cmd);	// Built-in commands
-
-		// TODO: Case for subshell
+		if(!cmd->argv[0] && !cmd->subshell){  // null command
+			exit(0);
+		}
+		handle_subshell(cmd);  // Subshell
+		handle_builtin_commands(cmd);  // Built-in commands
 
 		// Normal case
 		if(execvp(cmd->argv[0], cmd->argv)){
@@ -247,7 +249,7 @@ cmd_exec(command_t *cmd, int *pass_pipefd)
 			abort();
 		}
 	}
-	else{
+	else{  // Parent's duty
 		// If pipe is established, close the write end of it
 		if(cmd->controlop == CMD_PIPE){
 			close(pipefd[WRITE]);
@@ -303,11 +305,13 @@ static void redirect_fds(command_t* cmd){
 static void handle_builtin_commands(command_t* cmd){
 	if(strcmp(cmd->argv[0], "exit") == 0){
 		TBC
+		if(cmd->argv[2]){  // It should not have more than 1 argument
+		}
 	}
 	if(strcmp(cmd->argv[0], "cd") == 0){
 		TBC
 	}
-	if(strcmp(cmd->argv[0], "outpwd") == 0){
+	if(strcmp(cmd->argv[0], "our_pwd") == 0){
 		TBC
 	}
 }
