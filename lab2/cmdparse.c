@@ -216,7 +216,23 @@ cmd_free(command_t *cmd)
 	if (!cmd)
 		return;
 
-	/* Your code here. */
+     // Free argv
+     for(int i = 0; cmd->argv[i]; i++){
+          free(cmd->argv[i]);
+     }
+
+     // Free three file names
+     for(int i = 0; i < 3; i++){
+          free(cmd->redirect_filename[i]);
+     }
+
+     // Free tree-strucured subshell
+     cmd_free(cmd->subshell);
+     // Free linked list
+     cmd_free(cmd->next);
+
+     // Free self
+     free(cmd);
 }
 
 
