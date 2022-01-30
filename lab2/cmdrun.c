@@ -19,6 +19,10 @@
 #include "cmdparse.h"
 #include "cmdrun.h"
 
+#define TBC printf("To be implemented %s: %d\n", __FILE__, __LINE__);abort();
+#define WRITE 1
+#define READ 0
+
 /* cmd_exec(cmd, pass_pipefd)
  *
  *   Execute the single command specified in the 'cmd' command structure.
@@ -115,7 +119,9 @@ cmd_exec(command_t *cmd, int *pass_pipefd)
 	// Create a pipe, if this command is the left-hand side of a pipe.
 	// Return -1 if the pipe fails.
 	if (cmd->controlop == CMD_PIPE) {
-		/* Your code here*/
+		if(pipe(pipefd) < 0){
+			return -1;
+		}
 	}
 
 
@@ -211,12 +217,102 @@ cmd_exec(command_t *cmd, int *pass_pipefd)
 	//    This introduces a potential race condition.
 	//    Explain what that race condition is, and fix it.
 	//    Hint: Investigate fchdir().
-	/* Your code here */
+	pid = fork();
+	if(pid < 0){
+		perror("Cannot fork");
+		abort();
+	}
+	if(pid == 0){  // Child
+		// 1. If left side of pipe, redirect stdout to pipe
+		if(cmd->controlop == CMD_PIPE){
+			dup2(pipefd[WRITE], STDOUT_FILENO);
+			close(pipefd[READ]);
+			close(pipefd[WRITE]);
+		}
 
+		// 2. Setup stdin pipe
+		dup2(*pass_pipefd, STDIN_FILENO);
+		close(pipefd[READ]);
+		close(pipefd[WRITE]);
+
+		// 3. Set up redirect_filename
+		redirect_fds(cmd);
+
+		// 4. Execute
+		handle_builtin_commands(cmd);	// Built-in commands
+
+		// TODO: Case for subshell
+
+		// Normal case
+		if(execvp(cmd->argv[0], cmd->argv)){
+			perror("execvp");
+			abort();
+		}
+	}
+	else{
+		// If pipe is established, close the write end of it
+		if(cmd->controlop == CMD_PIPE){
+			close(pipefd[WRITE]);
+		}
+
+		// TODO: 2. Handle built-in commands
+
+		// 3. Set *pass_pipefd
+			if(cmd->controlop == CMD_PIPE){
+				*pass_pipefd = pipefd[READ];
+			}
+			else{
+				*pass_pipefd = STDIN_FILENO;
+			}
+	}
 	// return the child process ID
 	return pid;
 }
 
+static void redirect_fds(command_t* cmd){
+	// STDIN
+	if(cmd->redirect_filename[STDIN_FILENO]){
+		int stdin_fd = open(cmd->redirect_filename[STDIN_FILENO], O_RDONLY, 0666);
+		if(stdin_fd < 0){
+			perror("open");
+			abort();
+		}
+		dup2(stdin_fd, STDIN_FILENO);
+	}
+
+	// STDOUT
+	if(cmd->redirect_filename[STDOUT_FILENO]){
+		int stdout_fd = open(cmd->redirect_filename[STDOUT_FILENO], O_WRONLY | O_CREAT | O_TRUNC, 0666);
+		if(stdout_fd < 0){
+			perror("open");
+			abort();
+		}
+		dup2(stdout_fd, STDOUT_FILENO);
+	}
+
+	// STDERR
+	if(cmd->redirect_filename[STDERR_FILENO]){
+		int stderr_fd = open(cmd->redirect_filename[STDERR_FILENO], O_WRONLY | O_CREAT | O_TRUNC, 0666);
+		if(stderr_fd < 0){
+			perror("open");
+			abort();
+		}
+		dup2(stderr_fd, STDOUT_FILENO);
+		close(stderr_fd);
+	}
+}
+
+static void handle_builtin_commands(command_t* cmd){
+	if(strcmp(cmd->argv[0], "exit") == 0){
+		TBC
+	}
+	if(strcmp(cmd->argv[0], "cd") == 0){
+		TBC
+	}
+	if(strcmp(cmd->argv[0], "outpwd") == 0){
+		TBC
+	}
+}
 
 /* cmd_line_exec(cmdlist)
  *
@@ -258,7 +354,37 @@ cmd_line_exec(command_t *cmdlist)
 		// EXERCISE: Fill out this function!
 		// If an error occurs in cmd_exec, feel free to abort().
 
-		/* Your code here */
+		switch(cmdlist->controlop){
+			case CMD_END:
+			case CMD_SEMICOLON:{
+				pid_t child = cmd_exec(cmdlist, &pipefd);
+				waitpid(child, &wp_status, 0);
+				break;
+			}
+			case CMD_AND:{
+				pid_t child = cmd_exec(cmdlist, &pipefd);
+				waitpid(child, &wp_status, 0);
+				if(WEXITSTATUS(wp_status) != 0)
+					goto done;
+				break;
+			}
+			case CMD_OR:{
+				pid_t child = cmd_exec(cmdlist, &pipefd);
+				waitpid(child, &wp_status, 0);
+				if(WEXITSTATUS(wp_status) == 0)
+					goto done;
+				break;
+			}
+			case CMD_BACKGROUND:
+			case CMD_PIPE:{
+				pid_t child = cmd_exec(cmdlist, &pipefd);
+				wp_status = 0;
+				break;
+			}
+			default:{
+				abort();
+			}
+		}
 
 		cmdlist = cmdlist->next;
 	}
