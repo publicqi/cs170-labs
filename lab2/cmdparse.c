@@ -325,6 +325,9 @@ cmd_parse(parsestate_t *parsestate)
              //     you will have to understand how the pieces that you
              //     have been given fit together. (It may be helpful to
              //     look over cmdparse.h again.)
+               if(cmd->subshell){
+                    goto error;
+               }
                cmd->subshell = cmd_line_parse(parsestate, 1);
 			break;
 		default:
