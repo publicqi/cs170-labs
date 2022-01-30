@@ -316,6 +316,13 @@ static void handle_builtin_commands(command_t* cmd){
 	}
 }
 
+static void handle_subshell(command_t* cmd){
+	if(!cmd->subshell){  // Not a subshell
+		return;
+	}
+	exit(cmd_line_exec(cmd->subshell));
+}
+
 /* cmd_line_exec(cmdlist)
  *
  *   Execute the command list.
@@ -361,26 +368,29 @@ cmd_line_exec(command_t *cmdlist)
 			case CMD_SEMICOLON:{
 				pid_t child = cmd_exec(cmdlist, &pipefd);
 				waitpid(child, &wp_status, 0);
+				cmd_status = WEXITSTATUS(wp_status);
 				break;
 			}
 			case CMD_AND:{
 				pid_t child = cmd_exec(cmdlist, &pipefd);
 				waitpid(child, &wp_status, 0);
-				if(WEXITSTATUS(wp_status) != 0)
+				cmd_status = WEXITSTATUS(wp_status);
+				if(cmd_status != 0)
 					goto done;
 				break;
 			}
 			case CMD_OR:{
 				pid_t child = cmd_exec(cmdlist, &pipefd);
 				waitpid(child, &wp_status, 0);
-				if(WEXITSTATUS(wp_status) == 0)
+				cmd_status = WEXITSTATUS(wp_status);
+				if(cmd_status == 0)
 					goto done;
 				break;
 			}
 			case CMD_BACKGROUND:
 			case CMD_PIPE:{
 				pid_t child = cmd_exec(cmdlist, &pipefd);
-				wp_status = 0;
+				cmd_status = 0;
 				break;
 			}
 			default:{

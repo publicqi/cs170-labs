@@ -16,5 +16,6 @@
 int cmd_line_exec(command_t *);
 static void redirect_fds(command_t* cmd);
 static void handle_builtin_commands(command_t* cmd);
+static void handle_subshell(command_t* cmd);
 
 #endif
