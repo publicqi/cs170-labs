@@ -325,7 +325,9 @@ cmd_parse(parsestate_t *parsestate)
              //     you will have to understand how the pieces that you
              //     have been given fit together. (It may be helpful to
              //     look over cmdparse.h again.)
-               if(cmd->subshell){
+
+			   // If there is already a subshell or a command to run
+               if(cmd->subshell || cmd->argv[0]){
                     goto error;
                }
                cmd->subshell = cmd_line_parse(parsestate, 1);
