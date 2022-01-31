@@ -16,6 +16,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/syscall.h>
 #include "cmdparse.h"
 #include "cmdrun.h"
 
@@ -241,7 +242,7 @@ cmd_exec(command_t *cmd, int *pass_pipefd)
 			exit(0);
 		}
 		handle_subshell(cmd);  // Subshell
-		handle_builtin_commands(cmd);  // Built-in commands
+		handle_builtin_commands(cmd, 1);  // Built-in commands
 
 		// Normal case
 		if(execvp(cmd->argv[0], cmd->argv)){
@@ -255,7 +256,7 @@ cmd_exec(command_t *cmd, int *pass_pipefd)
 			close(pipefd[WRITE]);
 		}
 
-		// TODO: 2. Handle built-in commands
+		handle_builtin_commands(cmd, 0);
 
 		// 3. Set *pass_pipefd
 			if(cmd->controlop == CMD_PIPE){
@@ -302,17 +303,84 @@ static void redirect_fds(command_t* cmd){
 	}
 }
 
-static void handle_builtin_commands(command_t* cmd){
+static void handle_builtin_commands(command_t* cmd, int is_child){
+	if(!cmd->argv[0]){
+		return;
+	}
 	if(strcmp(cmd->argv[0], "exit") == 0){
-		TBC
 		if(cmd->argv[2]){  // It should not have more than 1 argument
+			if(is_child){
+				write(STDERR_FILENO, "exit: too many arguments\n", 26);
+				exit(1);  // Child returns 1
+			}
+			else{
+				return;
+			}
+		}
+
+		if(cmd->argv[1]){
+			char *endptr, *str;
+			long val;
+			str = cmd->argv[1];
+			errno = 0;
+			val = strtol(str, &endptr, 10);
+
+			if (errno != 0) {
+				if(is_child){
+					write(STDERR_FILENO, "numeric argument required\n", 27);
+				}
+				exit(2);  // Child returns 2
+			}
+			exit(val);  // Parent exit(val)
+		}
+		exit(0);  // // Parent exit(0)
+	}
+	// TODO: Potential race condition
+	if(strcmp(cmd->argv[0], "cd") == 0){
+		if(cmd->argv[1] && !cmd->argv[2]){  // Only takes one argument
+			if(is_child){
+				int status = chdir(cmd->argv[1]);
+				if(status < 0){
+					perror("cd");
+					exit(1);  // Child returns 1 if chdir fails
+				}
+				exit(0);  // Child returns 0 if normal
+			}
+			chdir(cmd->argv[1]);
+			return;
+		}
+		else{  // Syntax err
+			if(is_child){
+				write(STDERR_FILENO, "cd: Syntax error! Wrong number of arguments!\n", 45);
+				exit(1);  // Child returns
+			}
+			return;
 		}
 	}
-	if(strcmp(cmd->argv[0], "cd") == 0){
-		TBC
-	}
 	if(strcmp(cmd->argv[0], "our_pwd") == 0){
-		TBC
+		if(!is_child){  // Parent doesn't need to do anything
+			return;
+		}
+
+		if(cmd->argv[1]){
+			write(STDERR_FILENO, "pwd: Syntax error! Wrong number of arguments!\n", 46);
+			exit(1);  // Child returns
+		}
+
+		char* buffer = malloc(1024);
+		#ifdef __linux__
+		if(syscall(__NR_getcwd, buffer, 1024) < 0){
+			perror("getcwd");
+			free(buffer);
+			exit(1);
+		}
+		#else
+		SYSCALL LEVEL GETCWD
+		#endif
+
+		puts(buffer);
+		free(buffer);
+		exit(0);
 	}
 }
 
