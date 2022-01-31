@@ -1,11 +1,12 @@
-Name:
-PERM #: 
+Name: Qi Su
+PERM #: 8313819
 
 Collaborators (who you talked to about the lab, what you talked about):
 
 
 Source material that you consulted:
 
+man pages
 
 Other acknowledgments:
 
@@ -16,3 +17,7 @@ Responses to exercises (if any) that need to go into answers.txt:
 
 
 Anything else you'd like us to know:
+
+For "our_pwd", as the professor said we need to use syscalls in slack, I used `syscall(__NR_getcwd, buffer, 1024) < 0`.
+`getcwd` function itself is a library function wrapper of `getcwd` syscall.
+It behaves a little bit different than syscall (returned value).
