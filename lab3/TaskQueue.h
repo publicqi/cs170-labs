@@ -2,6 +2,7 @@
 
 
 #include "sthread.h"
+#include <queue>
 
 typedef void (*handler_t) (void *); 
 
@@ -22,6 +23,9 @@ struct Task {
 class TaskQueue {
     private:
     // TODO: More needed here.
+    std::queue<Task> q;
+    smutex_t mutex;
+    scond_t cv;
 
     public:
     TaskQueue();
