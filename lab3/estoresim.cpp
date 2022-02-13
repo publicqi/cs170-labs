@@ -1,5 +1,6 @@
 #include <cstring>
 #include <cstdlib>
+#include <stdio.h>
 
 #include "EStore.h"
 #include "TaskQueue.h"
@@ -43,6 +44,7 @@ static void*
 supplierGenerator(void* arg)
 {
     // TODO: Your code here.
+    printf("HELLO FROM SUPPLIER GENERATOR\n");
     return NULL; // Keep compiler happy.
 }
 
@@ -74,6 +76,7 @@ static void*
 customerGenerator(void* arg)
 {
     // TODO: Your code here.
+    printf("HELLO FROM CUSTOMER GENERATOR\n");
     return NULL; // Keep compiler happy.
 }
 
@@ -95,6 +98,7 @@ static void*
 supplier(void* arg)
 {
     // TODO: Your code here.
+    printf("HELLO FROM SUPPLIER\n");
     return NULL; // Keep compiler happy.
 }
 
@@ -116,6 +120,7 @@ static void*
 customer(void* arg)
 {
     // TODO: Your code here.
+    printf("HELLO FROM CUSTOMER\n");
     return NULL; // Keep compiler happy.
 }
 
@@ -145,7 +150,46 @@ customer(void* arg)
 static void
 startSimulation(int numSuppliers, int numCustomers, int maxTasks, bool useFineMode)
 {
-    // TODO: Your code here.
+    // Create a new Simlation object and setup
+    Simulation* s = new Simulation(useFineMode);
+    s->numSuppliers = numSuppliers;
+    s->numCustomers = numCustomers;
+    s->supplierTasks = TaskQueue();
+    s->customerTasks = TaskQueue();
+    s->maxTasks = maxTasks;
+
+    // Declares thread structs
+    sthread_t supplier_genertator_thread, customer_genertator_thread;
+    sthread_t *supplier_threads, *customer_threads;
+    supplier_threads = (sthread_t*) malloc(sizeof(sthread_t) * numSuppliers);
+    customer_threads = (sthread_t*) malloc(sizeof(sthread_t) * numCustomers);
+
+    // Creare threads
+    sthread_create(&supplier_genertator_thread, supplierGenerator, NULL);  // Maybe changeme
+    sthread_create(&customer_genertator_thread, customerGenerator, NULL);
+
+    for(int i = 0; i < numSuppliers; i++){
+        sthread_create(&supplier_threads[i], supplier, NULL);
+    }
+    for(int i = 0; i < numCustomers; i++){
+        sthread_create(&customer_threads[i], customer, NULL);
+    }
+
+    // Join threads
+    sthread_join(supplier_genertator_thread);
+    sthread_join(customer_genertator_thread);
+
+    for(int i = 0; i < numSuppliers; i++){
+        sthread_join(supplier_threads[i]);
+    }
+    for(int i = 0; i < numCustomers; i++){
+        sthread_join(customer_threads[i]);
+    }
+
+    // Memory cleanup
+    free(supplier_threads);
+    free(customer_threads);
+    delete s;
 }
 
 int main(int argc, char **argv)
