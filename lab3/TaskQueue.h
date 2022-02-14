@@ -24,7 +24,7 @@ class TaskQueue {
     private:
     std::queue<Task> q;
     smutex_t mutex;
-    scond_t cv;
+    scond_t queue_not_empty;
 
     public:
     TaskQueue();

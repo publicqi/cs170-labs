@@ -5,14 +5,14 @@ TaskQueue::
 TaskQueue()
 {
     smutex_init(&mutex);
-    scond_init(&cv);
+    scond_init(&queue_not_empty);
 }
 
 TaskQueue::
 ~TaskQueue()
 {
     smutex_destroy(&mutex);
-    scond_destroy(&cv);
+    scond_destroy(&queue_not_empty);
 }
 
 /*
@@ -71,7 +71,7 @@ enqueue(Task task)
 {
     smutex_lock(&mutex);
     q.push(task);
-    scond_signal(&cv, &mutex);
+    scond_signal(&queue_not_empty, &mutex);
     smutex_unlock(&mutex);
 }
 
@@ -92,7 +92,7 @@ dequeue()
 {
     smutex_lock(&mutex);
     while(empty()){
-        scond_wait(&cv, &mutex);
+        scond_wait(&queue_not_empty, &mutex);
     }
     Task t = q.front();
     q.pop();
