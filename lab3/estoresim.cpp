@@ -4,6 +4,7 @@
 
 #include "EStore.h"
 #include "TaskQueue.h"
+#include "RequestGenerator.h"
 
 class Simulation
 {
@@ -43,8 +44,12 @@ class Simulation
 static void*
 supplierGenerator(void* arg)
 {
-    // TODO: Your code here.
-    printf("HELLO FROM SUPPLIER GENERATOR\n");
+    Simulation* s = (Simulation*) arg;
+    SupplierRequestGenerator* srg = new SupplierRequestGenerator(&s->supplierTasks);
+    srg->enqueueTasks(s->maxTasks, &s->store);
+    srg->enqueueStops(s->numSuppliers);
+    
+    sthread_exit();
     return NULL; // Keep compiler happy.
 }
 
@@ -75,8 +80,13 @@ supplierGenerator(void* arg)
 static void*
 customerGenerator(void* arg)
 {
-    // TODO: Your code here.
-    printf("HELLO FROM CUSTOMER GENERATOR\n");
+    Simulation* s = (Simulation*) arg;
+    CustomerRequestGenerator* srg = new CustomerRequestGenerator(&s->customerTasks, s->store.fineModeEnabled());
+
+    srg->enqueueTasks(s->maxTasks, &s->store);
+    srg->enqueueStops(s->numCustomers);
+    
+    sthread_exit();
     return NULL; // Keep compiler happy.
 }
 
@@ -97,8 +107,15 @@ customerGenerator(void* arg)
 static void*
 supplier(void* arg)
 {
-    // TODO: Your code here.
-    printf("HELLO FROM SUPPLIER\n");
+    Simulation* s = (Simulation*) arg;
+    Task t;
+
+    for(;;){
+        t = s->supplierTasks.dequeue();
+        t.handler(t.arg);
+    }
+    
+    sthread_exit();
     return NULL; // Keep compiler happy.
 }
 
@@ -119,8 +136,15 @@ supplier(void* arg)
 static void*
 customer(void* arg)
 {
-    // TODO: Your code here.
-    printf("HELLO FROM CUSTOMER\n");
+    Simulation* s = (Simulation*) arg;
+    Task t;
+
+    for(;;){
+        t = s->customerTasks.dequeue();
+        t.handler(t.arg);
+    }
+    
+    sthread_exit();
     return NULL; // Keep compiler happy.
 }
 
@@ -165,14 +189,14 @@ startSimulation(int numSuppliers, int numCustomers, int maxTasks, bool useFineMo
     customer_threads = (sthread_t*) malloc(sizeof(sthread_t) * numCustomers);
 
     // Creare threads
-    sthread_create(&supplier_genertator_thread, supplierGenerator, NULL);  // Maybe changeme
-    sthread_create(&customer_genertator_thread, customerGenerator, NULL);
+    sthread_create(&supplier_genertator_thread, supplierGenerator, s);  // Maybe changeme
+    sthread_create(&customer_genertator_thread, customerGenerator, s);
 
     for(int i = 0; i < numSuppliers; i++){
-        sthread_create(&supplier_threads[i], supplier, NULL);
+        sthread_create(&supplier_threads[i], supplier, s);
     }
     for(int i = 0; i < numCustomers; i++){
-        sthread_create(&customer_threads[i], customer, NULL);
+        sthread_create(&customer_threads[i], customer, s);
     }
 
     // Join threads
