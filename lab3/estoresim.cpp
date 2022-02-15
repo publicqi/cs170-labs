@@ -1,10 +1,13 @@
 #include <cstring>
 #include <cstdlib>
 #include <stdio.h>
+#include <unistd.h>
 
 #include "EStore.h"
 #include "TaskQueue.h"
 #include "RequestGenerator.h"
+
+extern int gettid(void);
 
 class Simulation
 {
@@ -49,6 +52,8 @@ supplierGenerator(void* arg)
     srg->enqueueTasks(s->maxTasks, &s->store);
     srg->enqueueStops(s->numSuppliers);
     
+    // printf("supplierGenerator has generated %d tasks\n", s->maxTasks);
+    delete srg;
     sthread_exit();
     return NULL; // Keep compiler happy.
 }
@@ -86,6 +91,8 @@ customerGenerator(void* arg)
     srg->enqueueTasks(s->maxTasks, &s->store);
     srg->enqueueStops(s->numCustomers);
     
+    // printf("customerGenerator has generated %d tasks\n", s->maxTasks);
+    delete srg;
     sthread_exit();
     return NULL; // Keep compiler happy.
 }
@@ -178,8 +185,10 @@ startSimulation(int numSuppliers, int numCustomers, int maxTasks, bool useFineMo
     Simulation* s = new Simulation(useFineMode);
     s->numSuppliers = numSuppliers;
     s->numCustomers = numCustomers;
+    /*
     s->supplierTasks = TaskQueue();
     s->customerTasks = TaskQueue();
+    */
     s->maxTasks = maxTasks;
 
     // Declares thread structs
@@ -223,11 +232,12 @@ int main(int argc, char **argv)
     // Seed the random number generator.
     // You can remove this line or set it to some constant to get deterministic
     // results, but make sure you put it back before turning in.
-    srand(time(NULL));
+    int seed = time(NULL);
+    srand(seed);
 
     if (argc > 1)
         useFineMode = strcmp(argv[1], "--fine") == 0;
-    startSimulation(10, 10, 100, useFineMode);
+    startSimulation(10, 10, 300, useFineMode);
     return 0;
 }
 

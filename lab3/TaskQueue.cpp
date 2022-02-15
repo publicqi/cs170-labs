@@ -29,10 +29,7 @@ TaskQueue::
 int TaskQueue::
 size()
 {
-    smutex_lock(&mutex);
-    int size = q.size();
-    smutex_unlock(&mutex);
-    return size;
+    return size_q;
 }
 
 /*
@@ -49,10 +46,7 @@ size()
 bool TaskQueue::
 empty()
 {
-    smutex_lock(&mutex);
-    bool empty = q.empty();
-    smutex_unlock(&mutex);
-    return empty;
+    return size_q == 0; 
 }
 
 /*
@@ -71,6 +65,7 @@ enqueue(Task task)
 {
     smutex_lock(&mutex);
     q.push(task);
+    size_q ++;
     scond_signal(&queue_not_empty, &mutex);
     smutex_unlock(&mutex);
 }
@@ -96,6 +91,7 @@ dequeue()
     }
     Task t = q.front();
     q.pop();
+    size_q--;
 
     smutex_unlock(&mutex);
     return t;

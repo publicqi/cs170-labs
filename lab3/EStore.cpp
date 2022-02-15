@@ -1,6 +1,23 @@
 #include <cassert>
+#include <stdio.h>
 
 #include "EStore.h"
+#define LOCK()      do{  \
+                        if(fineModeEnabled()){  \
+                            smutex_lock(&fine_mutex[item_id]);  \
+                        }else{  \
+                            smutex_lock(&mutex);  \
+                        }  \
+                        }while(0)
+#define UNLOCK()    do{  \
+                        if(fineModeEnabled()){  \
+                            smutex_unlock(&fine_mutex[item_id]);  \
+                            return;  \
+                        }else{  \
+                            smutex_unlock(&mutex);  \
+                            return;  \
+                        }  \
+                        }while(0)
 
 using namespace std;
 
@@ -20,13 +37,20 @@ EStore::
 EStore(bool enableFineMode)
     : fineMode(enableFineMode)
 {
-    // TODO: Your code here.
+    smutex_init(&mutex);  // Mutex for fine mode is to lock shippingcost / discount
+    if(enableFineMode){
+        for(int i = 0; i < INVENTORY_SIZE; i++){
+            smutex_init(&fine_mutex[i]);
+        }
+    }
+    scond_init(&cv);
 }
 
 EStore::
 ~EStore()
 {
-    // TODO: Your code here.
+   smutex_destroy(&mutex);
+   scond_destroy(&cv);
 }
 
 /*
@@ -63,8 +87,26 @@ void EStore::
 buyItem(int item_id, double budget)
 {
     assert(!fineModeEnabled());
+    smutex_lock(&mutex);
 
-    // TODO: Your code here.
+    // If item is invalid
+    assert(item_id >= 0 && item_id < INVENTORY_SIZE);
+    Item item = inventory[item_id];
+    if(!item.valid){
+        smutex_unlock(&mutex);
+        return;
+    }
+
+    // Wait until has enough money and item in stock
+    while (budget < item.price * (1 - item.discount) * (1 - storeDiscount) + shippingCost
+        || item.quantity <= 0){
+        scond_wait(&cv, &mutex);
+    }
+
+    // Do the purchase
+    item.quantity --;
+
+    smutex_unlock(&mutex);
 }
 
 /*
@@ -116,8 +158,42 @@ void EStore::
 buyManyItems(vector<int>* item_ids, double budget)
 {
     assert(fineModeEnabled());
+    double total_cost = 0.0;
+    for (size_t i = 0; i < item_ids->size(); i++){
+        assert(item_ids->at(i) >= 0 && item_ids->at(i) < INVENTORY_SIZE);
+        // printf("buyManyItems: Acquiring lock for %d\n", item_ids->at(i));
+        smutex_lock(&fine_mutex[item_ids->at(i)]);
+        Item item = inventory[item_ids->at(i)];
 
-    // TODO: Your code here.
+        // Give up
+        if(!item.valid || !item.quantity){
+            // printf("buyManyItems: Failed to buy %d\n", item_ids->at(i));
+            // Unlock all item mutex that earlier locked
+            for(long j = i; j >= 0; j--){
+                // printf("buyManyItems: Releasing %d\n", item_ids->at(i));
+                smutex_unlock(&fine_mutex[item_ids->at(j)]);
+            }
+            return;
+        }
+
+        // Assume storeDiscount and shippingCost does not matter
+        total_cost += item.price * (1 - item.discount) * (1 - storeDiscount) + shippingCost;
+        if(total_cost > budget){
+            // Unlock all item mutex that earlier locked
+            for(long j = i; j >= 0; j--){
+                smutex_unlock(&fine_mutex[item_ids->at(j)]);
+            }
+            return;
+        }
+    }
+
+    // Do the purchase
+    // printf("Succesfully bought ");
+    for(size_t i = 0; i < item_ids->size(); i++){
+        inventory[item_ids->at(i)].quantity --;
+        // printf("%d ", item_ids->at(i));
+        smutex_unlock(&fine_mutex[item_ids->at(i)]);
+    }
 }
 
 /*
@@ -136,7 +212,24 @@ buyManyItems(vector<int>* item_ids, double budget)
 void EStore::
 addItem(int item_id, int quantity, double price, double discount)
 {
-    // TODO: Your code here.
+    // printf("Acquiring lock for %d\n", item_id);
+    LOCK();
+    // printf("Got lock for %d\n", item_id);
+
+    assert(item_id >= 0 && item_id < INVENTORY_SIZE);
+    // Failed to add
+    if(inventory[item_id].valid){
+        UNLOCK();
+    }
+
+    // Set the attributes
+    inventory[item_id].valid = true;
+    inventory[item_id].quantity = quantity;
+    inventory[item_id].price = price;
+    inventory[item_id].discount = discount;
+
+    // printf("Releasing lock for %d\n", item_id);
+    UNLOCK();
 }
 
 /*
@@ -157,7 +250,11 @@ addItem(int item_id, int quantity, double price, double discount)
 void EStore::
 removeItem(int item_id)
 {
-    // TODO: Your code here.
+    LOCK();
+
+    inventory[item_id].valid = false;
+
+    UNLOCK();
 }
 
 /*
@@ -175,7 +272,16 @@ removeItem(int item_id)
 void EStore::
 addStock(int item_id, int count)
 {
-    // TODO: Your code here.
+    LOCK();
+
+    inventory[item_id].quantity += count;
+
+    // Only needs to broadcast if there is a waiting cv
+    if(!fineModeEnabled()){
+        scond_broadcast(&cv, &mutex);
+    }
+
+    UNLOCK();
 }
 
 /*
@@ -195,7 +301,16 @@ addStock(int item_id, int count)
 void EStore::
 priceItem(int item_id, double price)
 {
-    // TODO: Your code here.
+    LOCK();
+
+    double old_price = inventory[item_id].price;
+    inventory[item_id].price = price;
+
+    if(!fineModeEnabled() && old_price > price){
+        scond_broadcast(&cv, &mutex);
+    }
+
+    UNLOCK();
 }
 
 /*
@@ -215,7 +330,15 @@ priceItem(int item_id, double price)
 void EStore::
 discountItem(int item_id, double discount)
 {
-    // TODO: Your code here.
+    LOCK();
+
+    double old_discount = inventory[item_id].discount;
+    inventory[item_id].discount = discount;
+    if(!fineModeEnabled() && old_discount < discount){
+        scond_broadcast(&cv, &mutex);
+    }
+
+    UNLOCK();
 }
 
 /*
@@ -233,7 +356,15 @@ discountItem(int item_id, double discount)
 void EStore::
 setShippingCost(double cost)
 {
-    // TODO: Your code here.
+    smutex_lock(&mutex);
+
+    double old_cost = shippingCost;
+    shippingCost = cost;
+    if(!fineModeEnabled() && old_cost > cost){
+        scond_broadcast(&cv, &mutex);
+    }
+
+    smutex_unlock(&mutex);
 }
 
 /*
@@ -251,7 +382,15 @@ setShippingCost(double cost)
 void EStore::
 setStoreDiscount(double discount)
 {
-    // TODO: Your code here.
+    smutex_lock(&mutex);
+
+    double old_discount = storeDiscount;
+    storeDiscount = discount;
+    if(!fineModeEnabled() && old_discount < discount){
+        scond_broadcast(&cv, &mutex);
+    }
+
+    smutex_unlock(&mutex);
 }
 
 

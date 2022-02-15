@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "Request.h"
+#include "sthread.h"
 
 /* 
  * ------------------------------------------------------------------
@@ -29,8 +30,8 @@ class Item {
     public:
     bool valid;
     int quantity;
-    double price;
-    double discount;
+    double price = 0.0;  // Makes valgrind happy
+    double discount = 0.0;  // Makes valgrind happy
 
     Item();
     ~Item();
@@ -68,7 +69,14 @@ class EStore {
     private:
     Item inventory[INVENTORY_SIZE];
     const bool fineMode;
-    // TODO: More needed here.
+    
+    double storeDiscount = 0.0;
+    double shippingCost = 0.0;
+
+    smutex_t mutex;
+    scond_t cv;  // Either out of budget or item not valid
+
+    smutex_t fine_mutex[INVENTORY_SIZE];  // For fine grained
 
     public:
 

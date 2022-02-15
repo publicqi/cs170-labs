@@ -23,6 +23,7 @@ struct Task {
 class TaskQueue {
     private:
     std::queue<Task> q;
+    int size_q = 0;
     smutex_t mutex;
     scond_t queue_not_empty;
 
