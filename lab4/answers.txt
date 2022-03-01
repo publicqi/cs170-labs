@@ -93,7 +93,8 @@ Did you complete Exercise 17A, Exercise 17B, or both?
 17A
 
 Exercise 18:
-
+Process 1. On the third line of the screenshot, there is a "1234234" pattern,
+indicating that process 1 met an interrupt.
 
 (Exercise 19 is a coding exercise)
 
