@@ -61,4 +61,22 @@ sys_exit(int status)
     loop: goto loop; // Convince GCC that function truly does not return.
 }
 
+static inline void
+sys_priority(int priority)
+{
+	asm volatile("int %0\n"
+		     : : "i" (INT_SYS_PRIORITY),
+		         "a" (priority)
+		     : "cc", "memory");
+}
+
+static inline void
+sys_putchar(unsigned int c)
+{
+	asm volatile("int %0\n"
+		     : : "i" (INT_SYS_PUTCHAR),
+		         "a" (c)
+		     : "cc", "memory");
+}
+
 #endif

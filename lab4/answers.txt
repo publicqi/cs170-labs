@@ -1,5 +1,5 @@
-Name:
-PERM #:
+Name: Qi Su
+PERM #: 8313819
 
 Collaborators (who you talked to about the lab, what you talked about):
 
@@ -15,41 +15,52 @@ Other acknowledgments:
 Part 1:
 
 Exercise 1:
+Read all files under each directory. Show match if "smutex" presents in the file.
 
+./lab3/sthread.cpp:void smutex_init(smutex_t *mutex)
+./lab3/sthread.cpp:void smutex_destroy(smutex_t *mutex)
+./lab3/sthread.cpp:void smutex_lock(smutex_t *mutex)
+./lab3/sthread.cpp:void smutex_unlock(smutex_t *mutex)
 
 Exercise 2:
-
+`grep -r "Task" RequestGenerator.cpp`
+`grep -r "return" *.h`
 
 Exercise 3:
-
+It returns function declarations that starts with "smutex". It tells how to call the functions
+and the parameter information.
 
 Exercise 4:
-
+include/linux/blkdev.h
 
 Exercise 5: 
-
+It's a priority inheritance state structure, located in kernel/futex.c.
 
 Exercise 6: 
-
+3. In "include/linux/sched.h".
 
 Exercise 7: 
-
+3908.
 
 Part 2:
 (Exercise 8 is a coding exercise)
 
 
 Exercise 9:
-
+Line 15. I changed it from a do-while loop to while-do loop.
+while (p){
+    r += 1;
+    p = p->next;
+};
 
 Exercise 10:
-
+16
 
 Exercise 11:
-
+P_EMPTY
 
 Exercise 12:
-
+The value of reg->reg_intno is 0, so it goes to default.
 
 (Exercise 13 is a coding exercise)
 
@@ -61,23 +72,25 @@ Exercise 14:
 
 The name of the scheduling algorithm is:
 
+Round-Robin
 
 (Exercise 15 is a coding exercise)
 
 
 Exercise 16:
 
-Average turnaround time for scheduling_algorithm 0:
-Average turnaround time for scheduling_algorithm 1:
+Average turnaround time for scheduling_algorithm 0: 1278.5 ms
+Average turnaround time for scheduling_algorithm 1: 800 ms
 
-Average response time for scheduling_algorithm 0:
-Average response time for scheduling_algorithm 1:
+Average response time for scheduling_algorithm 0: 1.5 ms
+Average response time for scheduling_algorithm 1: 480 ms
 
 
 Exercise 17:
 
 Did you complete Exercise 17A, Exercise 17B, or both?
 
+17A
 
 Exercise 18:
 

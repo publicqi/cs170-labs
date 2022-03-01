@@ -67,8 +67,7 @@ start(void)
 	// Set up hardware (x86.c)
 	segments_init();
 
-        zero = 202 / zero;
-	interrupt_controller_init(0);
+	interrupt_controller_init(1);
 	console_clear();
 
 	// Initialize process descriptors as empty
@@ -159,9 +158,16 @@ interrupt(registers_t *reg)
 		// time quantum).
 		// Switch to the next runnable process.
 		schedule();
+	
+	case INT_SYS_PRIORITY:
+		current->p_priority = reg->reg_eax;
+		schedule();
+
+	case INT_SYS_PUTCHAR:
+		*cursorpos++ = reg->reg_eax;
+		run(current);
 
 	default:
-                zero = 202 / zero;
 		while (1)
 			/* do nothing */;
 
@@ -188,7 +194,7 @@ schedule(void)
 {
 	pid_t pid = current->p_pid;
 
-	if (scheduling_algorithm == 0)
+	if (scheduling_algorithm == 0){
 		while (1) {
 			pid = (pid + 1) % NPROCS;
 
@@ -198,6 +204,31 @@ schedule(void)
 			if (proc_array[pid].p_state == P_RUNNABLE)
 				run(&proc_array[pid]);
 		}
+	}
+	else if (scheduling_algorithm == 1){  // priority scheduling
+		while(1){
+			pid = 0;
+			while(proc_array[pid].p_state != P_RUNNABLE){
+				pid = (pid + 1) % NPROCS;
+			}
+			run(&proc_array[pid]);
+		}
+	}
+	else if (scheduling_algorithm == 2){  // 17A
+		while(1){
+			int min = 0x7fffffff;
+			for(int i = 0; i < NPROCS; i++){  // Find the min priority
+				if(proc_array[i].p_state == P_RUNNABLE && proc_array[i].p_priority < min){
+					min = proc_array[i].p_priority;
+				}
+			}
+
+			pid = (pid + 1) % NPROCS;
+			if (proc_array[pid].p_state == P_RUNNABLE && proc_array[pid].p_priority <= min){
+				run(&proc_array[pid]);
+			}
+		}
+	}
 
 	// If we get here, we are running an unknown scheduling algorithm.
 	cursorpos = console_printf(cursorpos, 0x100, "\nUnknown scheduling algorithm %d\n", scheduling_algorithm);

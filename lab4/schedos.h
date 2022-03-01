@@ -17,6 +17,9 @@
 #define INT_SYS_USER1		50
 #define INT_SYS_USER2		51
 
+#define INT_SYS_PRIORITY    0x1337
+#define INT_SYS_PUTCHAR     0x1338
+
 
 // The current screen cursor position (stored at memory location 0x198000).
 
