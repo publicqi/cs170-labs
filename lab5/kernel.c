@@ -73,6 +73,7 @@ void memshow_physical(void);
 void memshow_virtual(x86_pagetable* pagetable, const char* name);
 void memshow_virtual_animate(void);
 int fork(void);
+uintptr_t get_free_page(int8_t owner);
 
 
 // kernel(command)
@@ -173,10 +174,11 @@ void process_setup(pid_t pid, int program_number) {
     assert(r >= 0);
 
     // Exercise 4: your code here
-    processes[pid].p_registers.reg_esp = PROC_START_ADDR + PROC_SIZE * pid;
+    processes[pid].p_registers.reg_esp = MEMSIZE_VIRTUAL;
     uintptr_t stack_page = processes[pid].p_registers.reg_esp - PAGESIZE;
-    physical_page_alloc(stack_page, pid);
-    virtual_memory_map(processes[pid].p_pagetable, stack_page, stack_page,
+    // physical_page_alloc(stack_page, pid);
+    uintptr_t new_page = get_free_page(pid);
+    virtual_memory_map(processes[pid].p_pagetable, stack_page, new_page,
                        PAGESIZE, PTE_P|PTE_W|PTE_U);
     processes[pid].p_state = P_RUNNABLE;
 }
@@ -285,6 +287,7 @@ void exception(x86_registers* reg) {
         }
         else{
             current->p_registers.reg_eax = -1;
+            console_printf(CPOS(23, 0), 0xC000, "Out of physical memory!");
         }
         
         break;
