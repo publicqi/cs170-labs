@@ -142,40 +142,30 @@ void process_setup(pid_t pid, int program_number) {
     process_init(&processes[pid], 0);
 
     // Exercise 2: your code here
-    uintptr_t available_page = 0;
 
     // Page for "page directory entry"
-    while(1){
-        if (physical_memory_isreserved(available_page) ||   // Reserved
-            pageinfo[PAGENUMBER(available_page)].refcount != 0){ // Already used
-            available_page += PAGESIZE;
-            continue;
+    for(int i = 0; i < PAGENUMBER(MEMSIZE_PHYSICAL); i++){
+        if (pageinfo[i].refcount == 0){
+            physical_page_alloc((i * PAGESIZE), pid);
+            memset((void*)(i * PAGESIZE), 0, PAGESIZE);
+            processes[pid].p_pagetable = (x86_pagetable *)(i * PAGESIZE);
+            break;
         }
-        assert(available_page < KERNEL_START_ADDR);
-        vamapping vam = virtual_memory_lookup(kernel_pagetable, available_page);
-        assert((vam.perm == (PTE_P | PTE_W)));
-        physical_page_alloc(available_page, pid);
-        memset((void*)available_page, 0, PAGESIZE);
-        processes[pid].p_pagetable = (x86_pagetable *)available_page;
-        break;
     }
 
-    available_page = 0;
     // Page for "page table entry"
-    while(1){
-        if (physical_memory_isreserved(available_page) ||   // Reserved
-            pageinfo[PAGENUMBER(available_page)].refcount != 0){ // Already used
-            available_page += PAGESIZE;
-            continue;
+    for(int i = 0; i < PAGENUMBER(MEMSIZE_PHYSICAL); i++){
+        if (pageinfo[i].refcount == 0){
+            physical_page_alloc((i * PAGESIZE), pid);
+            memset((void*)(i * PAGESIZE), 0, PAGESIZE);
+            processes[pid].p_pagetable->entry[0] = (i * PAGESIZE) | PTE_P | PTE_W | PTE_U;
+            break;
         }
-        assert(available_page < KERNEL_START_ADDR);
-        vamapping vam = virtual_memory_lookup(kernel_pagetable, available_page);
-        assert((vam.perm == (PTE_P | PTE_W)));
-        physical_page_alloc(available_page, pid);
-        memset((void*)available_page, 0, PAGESIZE);
-        processes[pid].p_pagetable->entry[0] = available_page | PTE_P | PTE_W | PTE_U;
-        break;
     }
+    assert(processes[pid].p_pagetable != 0);
+    assert(processes[pid].p_pagetable->entry[0] != 0);
+
+
     virtual_memory_map(processes[pid].p_pagetable, 0, 0, PROC_START_ADDR, PTE_P | PTE_W);
     virtual_memory_map(processes[pid].p_pagetable, (uintptr_t)console, (uintptr_t)console, PAGESIZE, PTE_P | PTE_W | PTE_U);
 
