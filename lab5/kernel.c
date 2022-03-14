@@ -211,19 +211,12 @@ int physical_page_alloc(uintptr_t addr, int8_t owner) {
 }
 
 uintptr_t get_free_page(int8_t owner){
-     uintptr_t available_page = 0;
-
-    // Page for "page directory entry"
     for(int i = 0; i < PAGENUMBER(MEMSIZE_PHYSICAL); i++){
-        if (physical_memory_isreserved(available_page) ||   // Reserved
-            pageinfo[PAGENUMBER(available_page)].refcount != 0){ // Already used
-            available_page += PAGESIZE;
-            continue;
+        if (pageinfo[i].refcount == 0){
+            physical_page_alloc(i * PAGESIZE, owner);
+            memset((void*)(i * PAGESIZE), 0, PAGESIZE);
+            return (uintptr_t)(i * PAGESIZE);
         }
-        vamapping vam = virtual_memory_lookup(kernel_pagetable, available_page);
-        physical_page_alloc(available_page, owner);
-        memset((void*)available_page, 0, PAGESIZE);
-        return available_page;
     }
     return 0;
 }
