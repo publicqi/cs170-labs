@@ -74,6 +74,7 @@ void memshow_virtual(x86_pagetable* pagetable, const char* name);
 void memshow_virtual_animate(void);
 int fork(void);
 uintptr_t get_free_page(int8_t owner);
+x86_pagetable* copy_pagetable(x86_pagetable* pagetable, int8_t owner);
 
 
 // kernel(command)
@@ -211,6 +212,19 @@ uintptr_t get_free_page(int8_t owner){
         }
     }
     return 0;
+}
+
+x86_pagetable* copy_pagetable(x86_pagetable* pagetable, int8_t owner){
+    x86_pagetable* new_pagetable = (x86_pagetable*) get_free_page(owner);
+    assert(new_pagetable != 0);
+    for(int i = 0; i < PAGETABLE_NENTRIES; i++){
+        if (pagetable->entry[i] != 0){
+            uintptr_t new_entry_page = (uintptr_t) get_free_page(owner);
+            memcpy((void*)new_entry_page, (void*)(pagetable->entry[i] & ~(0xfff)), PAGESIZE);
+            new_pagetable->entry[i] = new_entry_page | (pagetable->entry[i] & (0xfff));
+        }
+    }
+    return new_pagetable;
 }
 
 
