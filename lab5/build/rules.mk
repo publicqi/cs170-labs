@@ -2,7 +2,7 @@ OBJDIR := obj
 comma = ,
 
 # Cross-compiler toolchain
-CC	= $(GCCPREFIX)gcc
+CC	= $(GCCPREFIX)clang
 CXX	= $(GCCPREFIX)c++
 AS	= $(GCCPREFIX)as
 AR	= $(GCCPREFIX)ar

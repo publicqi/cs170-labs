@@ -117,6 +117,8 @@ void kernel(const char* command) {
     //    that "belongs" to the kernel is virtual addresses
     //    [0,PROC_START_ADDR). This is indicated in the lab description,
     //    and we repeat it in this hint.
+    virtual_memory_map(kernel_pagetable, 0, 0, PROC_START_ADDR, PTE_P | PTE_W);
+    virtual_memory_map(kernel_pagetable, (uintptr_t)console, (uintptr_t)console, PAGESIZE, PTE_P | PTE_W | PTE_U);
 
     if (command && strcmp(command, "fork") == 0)
         process_setup(1, 4);
@@ -140,8 +142,43 @@ void process_setup(pid_t pid, int program_number) {
     process_init(&processes[pid], 0);
 
     // Exercise 2: your code here
-    processes[pid].p_pagetable = kernel_pagetable;
-    ++pageinfo[PAGENUMBER(kernel_pagetable)].refcount;
+    uintptr_t available_page = 0;
+
+    // Page for "page directory entry"
+    while(1){
+        if (physical_memory_isreserved(available_page) ||   // Reserved
+            pageinfo[PAGENUMBER(available_page)].refcount != 0){ // Already used
+            available_page += PAGESIZE;
+            continue;
+        }
+        assert(available_page < KERNEL_START_ADDR);
+        vamapping vam = virtual_memory_lookup(kernel_pagetable, available_page);
+        assert((vam.perm == (PTE_P | PTE_W)));
+        physical_page_alloc(available_page, pid);
+        memset((void*)available_page, 0, PAGESIZE);
+        processes[pid].p_pagetable = (x86_pagetable *)available_page;
+        break;
+    }
+
+    available_page = 0;
+    // Page for "page table entry"
+    while(1){
+        if (physical_memory_isreserved(available_page) ||   // Reserved
+            pageinfo[PAGENUMBER(available_page)].refcount != 0){ // Already used
+            available_page += PAGESIZE;
+            continue;
+        }
+        assert(available_page < KERNEL_START_ADDR);
+        vamapping vam = virtual_memory_lookup(kernel_pagetable, available_page);
+        assert((vam.perm == (PTE_P | PTE_W)));
+        physical_page_alloc(available_page, pid);
+        memset((void*)available_page, 0, PAGESIZE);
+        processes[pid].p_pagetable->entry[0] = available_page | PTE_P | PTE_W | PTE_U;
+        break;
+    }
+    virtual_memory_map(processes[pid].p_pagetable, 0, 0, PROC_START_ADDR, PTE_P | PTE_W);
+    virtual_memory_map(processes[pid].p_pagetable, (uintptr_t)console, (uintptr_t)console, PAGESIZE, PTE_P | PTE_W | PTE_U);
+
     int r = program_load(&processes[pid], program_number);
     assert(r >= 0);
 

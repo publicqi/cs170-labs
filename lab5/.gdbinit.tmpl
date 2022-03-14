@@ -1,4 +1,5 @@
 init-if-undefined $target_set = 0
+source ~/Downloads/pwndbg/gdbinit.py 
 if $target_set == 0
     target remote localhost:__gdb_port__
     file obj/kernel.full
