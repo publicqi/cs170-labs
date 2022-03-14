@@ -210,6 +210,24 @@ int physical_page_alloc(uintptr_t addr, int8_t owner) {
     }
 }
 
+uintptr_t get_free_page(int8_t owner){
+     uintptr_t available_page = 0;
+
+    // Page for "page directory entry"
+    for(int i = 0; i < PAGENUMBER(MEMSIZE_PHYSICAL); i++){
+        if (physical_memory_isreserved(available_page) ||   // Reserved
+            pageinfo[PAGENUMBER(available_page)].refcount != 0){ // Already used
+            available_page += PAGESIZE;
+            continue;
+        }
+        vamapping vam = virtual_memory_lookup(kernel_pagetable, available_page);
+        physical_page_alloc(available_page, owner);
+        memset((void*)available_page, 0, PAGESIZE);
+        return available_page;
+    }
+    return 0;
+}
+
 
 // exception(reg)
 //    Exception handler (for interrupts, traps, and faults).
@@ -270,11 +288,22 @@ void exception(x86_registers* reg) {
 
 
         // Exercise 3: your code here
+        /*
         int r = physical_page_alloc(addr, current->p_pid);
         if (r >= 0)
             virtual_memory_map(current->p_pagetable, addr, addr,
                                PAGESIZE, PTE_P|PTE_W|PTE_U);
-        current->p_registers.reg_eax = r;
+        */
+        uintptr_t page = get_free_page(current->p_pid);
+        if (page != 0){
+            virtual_memory_map(current->p_pagetable, addr, page,
+                               PAGESIZE, PTE_P|PTE_W|PTE_U);
+            current->p_registers.reg_eax = 0;
+        }
+        else{
+            current->p_registers.reg_eax = -1;
+        }
+        
         break;
     }
 
