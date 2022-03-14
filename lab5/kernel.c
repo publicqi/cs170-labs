@@ -145,39 +145,14 @@ void process_setup(pid_t pid, int program_number) {
 
     // Exercise 2: your code here
 
-    // Page for "page directory entry"
-    for(int i = 0; i < PAGENUMBER(MEMSIZE_PHYSICAL); i++){
-        if (pageinfo[i].refcount == 0){
-            physical_page_alloc((i * PAGESIZE), pid);
-            memset((void*)(i * PAGESIZE), 0, PAGESIZE);
-            processes[pid].p_pagetable = (x86_pagetable *)(i * PAGESIZE);
-            break;
-        }
-    }
-
-    // Page for "page table entry"
-    for(int i = 0; i < PAGENUMBER(MEMSIZE_PHYSICAL); i++){
-        if (pageinfo[i].refcount == 0){
-            physical_page_alloc((i * PAGESIZE), pid);
-            memset((void*)(i * PAGESIZE), 0, PAGESIZE);
-            processes[pid].p_pagetable->entry[0] = (i * PAGESIZE) | PTE_P | PTE_W | PTE_U;
-            break;
-        }
-    }
-    assert(processes[pid].p_pagetable != 0);
-    assert(processes[pid].p_pagetable->entry[0] != 0);
-
-
-    virtual_memory_map(processes[pid].p_pagetable, 0, 0, PROC_START_ADDR, PTE_P | PTE_W);
-    virtual_memory_map(processes[pid].p_pagetable, (uintptr_t)console, (uintptr_t)console, PAGESIZE, PTE_P | PTE_W | PTE_U);
-
+    processes[pid].p_pagetable = copy_pagetable(kernel_pagetable, pid);
+    virtual_memory_map(processes[pid].p_pagetable, PROC_START_ADDR, PROC_START_ADDR, MEMSIZE_PHYSICAL - PROC_START_ADDR, PTE_W);
     int r = program_load(&processes[pid], program_number);
     assert(r >= 0);
 
     // Exercise 4: your code here
     processes[pid].p_registers.reg_esp = MEMSIZE_VIRTUAL;
     uintptr_t stack_page = processes[pid].p_registers.reg_esp - PAGESIZE;
-    // physical_page_alloc(stack_page, pid);
     uintptr_t new_page = get_free_page(pid);
     virtual_memory_map(processes[pid].p_pagetable, stack_page, new_page,
                        PAGESIZE, PTE_P|PTE_W|PTE_U);
@@ -362,6 +337,29 @@ int fork(void) {
     processes[pid].p_registers = current->p_registers;
     processes[pid].p_registers.reg_eax = 0;
     processes[pid].p_state = P_RUNNABLE;
+
+    processes[pid].p_pagetable = copy_pagetable(current->p_pagetable, pid);
+    virtual_memory_map(processes[pid].p_pagetable, PROC_START_ADDR, PROC_START_ADDR, MEMSIZE_PHYSICAL - PROC_START_ADDR, PTE_W);
+
+    for(uintptr_t va = 0; va < MEMSIZE_PHYSICAL; va += PAGESIZE){
+        vamapping vam = virtual_memory_lookup(current->p_pagetable, va);
+        if(vam.pa == (uintptr_t)console){
+            continue;
+        }
+        if ((vam.perm & (PTE_P | PTE_U | PTE_W)) == (PTE_P | PTE_U | PTE_W)){  // If writable
+            uintptr_t new_page = get_free_page(pid);
+            assert(new_page != 0);
+            log_printf("[%d] %p %p %p\n", pid, processes[pid].p_pagetable, va, new_page);
+            virtual_memory_map(processes[pid].p_pagetable, va, new_page, PAGESIZE, vam.perm);
+            memcpy((void*)new_page, (void*)vam.pa, PAGESIZE);
+        }
+    }
+
+    vamapping stack_vam = virtual_memory_lookup(current->p_pagetable, MEMSIZE_VIRTUAL - PAGESIZE);
+    uintptr_t stack_page = get_free_page(pid);
+    virtual_memory_map(processes[pid].p_pagetable, MEMSIZE_VIRTUAL - PAGESIZE, stack_page, PAGESIZE, PTE_P|PTE_W|PTE_U);
+    memcpy((void*)stack_page, (void*)stack_vam.pa, PAGESIZE);
+
     return pid;
 }
 
